@@ -1,0 +1,28 @@
+Risk Dice Rolls
+===============
+Replaces Warzone's percentage-based combat system with Risk-style dice rolling. Instead of fixed kill rates, battles are resolved with dice and fought to completion in a single attack order.
+
+How it works
+------------
+When you commit armies to an attack, the battle is fought entirely in one go — dice keep rolling until either all your attacking armies are dead or the defending territory is captured. You risk only the armies you commit, so attacking with 10 out of 100 means you can lose at most 10.
+
+Each round of dice:
+- Attacker rolls up to 3 dice (capped by remaining attacking armies)
+- Defender rolls up to 2 dice (capped by remaining defending armies)
+- Highest attacker die vs highest defender die — winner takes no loss, loser loses 1 army
+- If both sides have a second die, second highest are compared the same way
+- Defender wins all ties
+
+Commanders
+----------
+Commanders count as 7 armies for combat purposes and are the last to die — regular armies absorb all losses first. Within a single attack, damage accumulates against the commander once regular armies are gone. If the commander takes all 7 damage in one attack, they die and the player is eliminated. If the commander survives the attack, their health fully resets for the next turn.
+
+Commanders only participate in an attack if you explicitly commit them to it.
+
+Tips
+----
+- Small armies can realistically beat large ones through lucky dice — every battle has a chance.
+- Attacking with exactly 3 armies maximises your dice count relative to losses.
+- Defending with 2 armies gives you the maximum 2 dice, making small garrisons surprisingly resilient.
+- Commanders make territories extremely hard to capture — 7 extra effective armies that must all be killed in one attack.
+- This mod respects Warzone's "One Army Must Stand Guard" setting.
