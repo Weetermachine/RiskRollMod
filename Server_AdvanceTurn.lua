@@ -31,8 +31,9 @@ local function rollDice(n, sides, seedBase)
     local rolls = {}
     for i = 1, n do
         _rollCounter = _rollCounter + 1
-        math.randomseed(seedBase + _rollCounter * 999983 + i * 49999)
-        rolls[i] = math.random(1, sides)
+        local raw = math.random(1, 1000000)
+        local mixed = (raw * seedBase + _rollCounter * 999983 + i * 49999)
+        rolls[i] = (mixed % sides) + 1
     end
     table.sort(rolls, function(a, b) return a > b end)
     return rolls
@@ -162,14 +163,11 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
 
 
 
-    -- Build a seed from values that vary per attack
-    local turnNum   = game.Game.NumberOfTurns
-    local fromTerrID = order.From
-    local seedBase  = turnNum * 1000000
-                    + fromTerrID * 7919
-                    + toTerrID * 6271
-                    + attackRegular * 1009
-                    + defendRegular * 877
+    local seedBase = game.Game.NumberOfTurns * 1000000
+                   + order.From * 7919
+                   + toTerrID * 6271
+                   + attackRegular * 1009
+                   + defendRegular * 877
 
     local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log =
         simulateBattle(attackRegular, attackHasCmd,
