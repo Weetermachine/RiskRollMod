@@ -25,9 +25,14 @@ local function findCommanderInTerritory(standing, terrID, ownerID)
     return findCommanderInArmies(ts.NumArmies, ownerID)
 end
 
+local _seedCounter = 0
 local function rollDice(n, sides)
     local rolls = {}
-    for i = 1, n do rolls[i] = math.random(1, sides) end
+    for i = 1, n do
+        _seedCounter = _seedCounter + 1
+        math.randomseed(os.time() * 1000 + _seedCounter * 7 + i * 13)
+        rolls[i] = math.random(1, sides)
+    end
     table.sort(rolls, function(a, b) return a > b end)
     return rolls
 end
@@ -153,6 +158,8 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local tieGoesToAttacker = (Mod.Settings.TieWinner == 'Attacker')
     local diceSides = tonumber(Mod.Settings.DiceSides) or 6
     if diceSides < 2 then diceSides = 2 end
+
+
 
     local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log =
         simulateBattle(attackRegular, attackHasCmd,
