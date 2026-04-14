@@ -15,6 +15,7 @@ function Client_PresentSettingsUI(rootParent)
     local retreatLossRatio   = Mod.Settings.RetreatOnLossRatio   == true
     local lossRatioPct       = tonumber(Mod.Settings.RetreatLossRatioPct) or 100
     local minRounds          = tonumber(Mod.Settings.RetreatMinRounds)      or 3
+    local overwhelmingRatio  = tonumber(Mod.Settings.OverwhelmingOddsRatio) or 5
 
     UI.CreateLabel(vert)
         .SetText('Replaces Warzone combat with Risk-style dice. Battles are fought to completion.\n\n'
@@ -25,7 +26,7 @@ function Client_PresentSettingsUI(rootParent)
                  .. '• Commanders count as 7 armies and die last.\n\n'
                  .. 'Retreat rules:\n'
                  .. '• Retreat on dice parity: ' .. (retreatDiceParity and 'On' or 'Off') .. '\n'
-                 .. '• Retreat on loss ratio: ' .. (retreatLossRatio and ('On (' .. lossRatioPct .. '%, min ' .. minRounds .. ' rounds)') or 'Off'))
+                 .. '• Retreat on loss ratio: ' .. (retreatLossRatio and ('On (' .. lossRatioPct .. '%, min ' .. minRounds .. ' rounds, disabled at ' .. overwhelmingRatio .. 'x odds)') or 'Off'))
 
     UI.CreateLabel(vert)
         .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')

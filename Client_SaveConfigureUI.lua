@@ -38,6 +38,13 @@ function Client_SaveConfigureUI(alert, addCard)
     end
     Mod.Settings.RetreatMinRounds = minRounds
 
+    local overwhelmingRatio = math.floor(_RiskMod_overwhelmingInput.GetValue())
+    if overwhelmingRatio < 2 then
+        alert('Overwhelming odds ratio must be at least 2.')
+        return
+    end
+    Mod.Settings.OverwhelmingOddsRatio = overwhelmingRatio
+
     local lossRatio = math.floor(_RiskMod_lossRatioInput.GetValue())
     if lossRatio < 1 then
         alert('Loss ratio threshold must be at least 1%.')

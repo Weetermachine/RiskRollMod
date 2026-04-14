@@ -84,6 +84,15 @@ function Client_PresentConfigureUI(rootParent)
         .SetSliderMaxValue(20)
 
     UI.CreateLabel(vert)
+        .SetText('Overwhelming odds ratio: loss ratio retreat disabled if attacker has X times more armies than defender (default: 5)')
+
+    local overwhelmingInput = UI.CreateNumberInputField(vert)
+        .SetValue(tonumber(Mod.Settings.OverwhelmingOddsRatio) or 5)
+        .SetWholeNumbers(true)
+        .SetSliderMinValue(2)
+        .SetSliderMaxValue(20)
+
+    UI.CreateLabel(vert)
         .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')
         .SetColor('#FF8C00')
 
@@ -95,5 +104,6 @@ function Client_PresentConfigureUI(rootParent)
     _RiskMod_cbDiceParity    = cbDiceParity
     _RiskMod_cbLossRatio     = cbLossRatio
     _RiskMod_lossRatioInput  = lossRatioInput
-    _RiskMod_minRoundsInput  = minRoundsInput
+    _RiskMod_minRoundsInput     = minRoundsInput
+    _RiskMod_overwhelmingInput  = overwhelmingInput
 end

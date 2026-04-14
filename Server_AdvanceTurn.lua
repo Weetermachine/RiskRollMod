@@ -62,7 +62,7 @@ local function simulateBattle(attackRegular, attackHasCmd,
                                tieGoesToAttacker, diceSides,
                                maxAttackDice, maxDefendDice,
                                retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct,
-                               retreatMinRounds)
+                               retreatMinRounds, retreatOddsThresholdPct)
     local aReg   = attackRegular
     local aCmdHP = attackHasCmd and 7 or 0
     local dReg   = defendRegular
@@ -93,9 +93,20 @@ local function simulateBattle(attackRegular, attackHasCmd,
         end
     end
 
-    local initialADice = math.min(attackRegular + (attackHasCmd and 7 or 0), maxAttackDice)
-    local initialDDice = math.min(defendRegular + (defendHasCmd and 7 or 0), maxDefendDice)
+    local aStartTotal = attackRegular + (attackHasCmd and 7 or 0)
+    local dStartTotal = defendRegular + (defendHasCmd and 7 or 0)
+    local overwhelmingRatio = tonumber(Mod.Settings.OverwhelmingOddsRatio) or 5
+    local overwhelmingOdds = dStartTotal > 0 and (aStartTotal / dStartTotal) >= overwhelmingRatio
+    local initialADice = math.min(aStartTotal, maxAttackDice)
+    local initialDDice = math.min(dStartTotal, maxDefendDice)
     local retreated = false
+    local retreatReason = ''
+
+    -- Disable retreat rules if attacker has overwhelming odds
+    local overwhelmingOdds = false
+    if retreatOddsThresholdPct ~= nil and defendRegular > 0 then
+        overwhelmingOdds = (attackRegular >= defendRegular * (retreatOddsThresholdPct / 100))
+    end
 
     local round = 0
     local prevARolls = nil
@@ -159,22 +170,24 @@ local function simulateBattle(attackRegular, attackHasCmd,
 
         -- Rule 1: retreat if attacker dice <= defender dice, unless they
         -- started at or below parity (deliberate underdog attack).
-        if retreatOnDiceParity and initialADice > initialDDice then
+        if retreatOnDiceParity and not overwhelmingOdds and initialADice > initialDDice then
             local curADice = math.min(aTotal(), maxAttackDice)
             local curDDice = math.min(dTotal(), maxDefendDice)
             if curADice <= curDDice then
                 retreated = true
-                log[#log + 1] = '[Retreat: attacker dice dropped to ' .. curADice .. ' vs defender ' .. curDDice .. ']'
+                retreatReason = 'Attacker dice dropped to parity (' .. curADice .. ' vs ' .. curDDice .. ')'
+                log[#log + 1] = '[Retreat: dice parity]'
                 break
             end
         end
 
         -- Rule 2: retreat if attacker has lost X% more than defender after 3+ rounds
-        if retreatOnLossRatio and round >= retreatMinRounds and dRegLost > 0 then
+        if retreatOnLossRatio and not overwhelmingOdds and round >= retreatMinRounds and dRegLost > 0 then
             local lossRatio = (aRegLost / dRegLost - 1) * 100
             if lossRatio >= retreatLossRatioPct then
                 retreated = true
-                log[#log + 1] = '[Retreat: attacker losses ' .. math.floor(lossRatio) .. '% greater than defender]'
+                retreatReason = 'Attacker losses ' .. math.floor(lossRatio) .. '% greater than defender after ' .. round .. ' rounds'
+                log[#log + 1] = '[Retreat: loss ratio]'
                 break
             end
         end
@@ -191,7 +204,7 @@ local function simulateBattle(attackRegular, attackHasCmd,
         for i = #log - 2, #log do trimmedLog[#trimmedLog + 1] = log[i] end
     end
 
-    return aRegLost, aCmdDmg, dRegLost, dCmdDmg, trimmedLog, retreated
+    return aRegLost, aCmdDmg, dRegLost, dCmdDmg, trimmedLog, retreated, retreatReason
 end
 
 -----------------------------------------------------------------------
@@ -228,14 +241,16 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local retreatOnDiceParity = Mod.Settings.RetreatOnDiceParity ~= false
     local retreatOnLossRatio  = Mod.Settings.RetreatOnLossRatio  ~= false
     local retreatLossRatioPct   = tonumber(Mod.Settings.RetreatLossRatioPct)   or 100
-    local retreatMinRounds      = tonumber(Mod.Settings.RetreatMinRounds)      or 3
-    if retreatMinRounds < 1 then retreatMinRounds = 1 end
+    local retreatMinRounds           = tonumber(Mod.Settings.RetreatMinRounds)          or 3
+    local retreatOddsThresholdPct     = tonumber(Mod.Settings.RetreatOddsThresholdPct)   or 500
+    if retreatMinRounds < 1           then retreatMinRounds = 1           end
+    if retreatOddsThresholdPct < 100  then retreatOddsThresholdPct = 100  end
     if diceSides < 2          then diceSides = 2          end
     if maxAttackDice < 1      then maxAttackDice = 1      end
     if maxDefendDice < 1      then maxDefendDice = 1      end
     if retreatLossRatioPct < 1 then retreatLossRatioPct = 1 end
 
-    local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log, retreated =
+    local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log, retreated, retreatReason =
         simulateBattle(attackRegular, attackHasCmd,
                        defendRegular, defendHasCmd,
                        tieGoesToAttacker, diceSides,
@@ -261,13 +276,18 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
                  .. defendRegular .. (defendHasCmd and '+C' or '') .. ':\n'
     local fullMsg = summary .. table.concat(log, '\n')
 
-    -- Append commander death notes
-    if retreated then fullMsg = fullMsg .. '\n[Attacker retreated]' end
     if attackCmdKilled then fullMsg = fullMsg .. '\n[Attacker CMD died]' end
     if defendCmdKilled then fullMsg = fullMsg .. '\n[Defender CMD died]' end
 
     local event = WL.GameOrderEvent.Create(playerID, fullMsg, { playerID, defenderID }, nil, nil, nil)
     addNewOrder(event, true)
+
+    -- Separate retreat message
+    if retreated then
+        local retreatMsg = attackerName .. ' retreated! ' .. retreatReason .. '.'
+        local retreatEvent = WL.GameOrderEvent.Create(playerID, retreatMsg, { playerID, defenderID }, nil, nil, nil)
+        addNewOrder(retreatEvent, true)
+    end
 end
 
 function Server_AdvanceTurn_End(game, addNewOrder)
