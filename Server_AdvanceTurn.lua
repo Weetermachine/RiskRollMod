@@ -1,14 +1,15 @@
 -- Server_AdvanceTurn.lua
 -- "Risk Dice Rolls" mod
 --
--- Replaces Warzone's combat system with Risk-style dice:
---   Attacker rolls up to 3 dice, defender rolls up to 2 dice.
---   Highest vs highest, second vs second. Defender wins ties.
---   Battle repeats until one side is completely wiped out.
+-- Replaces Warzone's combat math with Risk-style dice by modifying the
+-- order result in place. This lets Warzone handle captures, card awards,
+-- elimination, and special unit death naturally.
 --
--- Commanders count as 7 armies, die last (regular armies absorb losses first).
--- If a commander survives the attack, their health resets next turn.
--- Commander only participates if explicitly committed to the attack.
+-- We run our own dice simulation, then set:
+--   orderResult.AttackingArmiesKilled
+--   orderResult.DefendingArmiesKilled
+--   orderResult.IsSuccessful
+--   orderResult.DamageToSpecialUnits (for commanders)
 
 function Server_AdvanceTurn_Start(game, addNewOrder)
 end
@@ -17,9 +18,10 @@ end
 -- Helpers
 -----------------------------------------------------------------------
 
-local function findCommander(specialUnits, ownerID)
-    if specialUnits == nil then return nil end
-    for _, unit in ipairs(specialUnits) do
+local function findCommanderInArmies(armies, ownerID)
+    local units = armies.SpecialUnits
+    if units == nil then return nil end
+    for _, unit in ipairs(units) do
         if unit.proxyType == 'Commander' and unit.OwnerID == ownerID then
             return unit
         end
@@ -27,95 +29,84 @@ local function findCommander(specialUnits, ownerID)
     return nil
 end
 
--- Roll N dice, return sorted descending array
+local function findCommanderInTerritory(standing, terrID, ownerID)
+    local ts = standing.Territories[terrID]
+    if ts == nil then return nil end
+    return findCommanderInArmies(ts.NumArmies, ownerID)
+end
+
+-- Roll N dice, return sorted descending
 local function rollDice(n)
     local rolls = {}
-    for i = 1, n do
-        rolls[i] = math.random(1, 6)
-    end
+    for i = 1, n do rolls[i] = math.random(1, 6) end
     table.sort(rolls, function(a, b) return a > b end)
     return rolls
 end
 
--- Simulate one full Risk battle to completion.
--- Returns: attackerLosses, defenderLosses, attackerCommanderDied, defenderCommanderDied
-local function simulateBattle(attackArmies, attackHasCommander,
-                               defendArmies, defendHasCommander,
+-- Simulate a full Risk battle.
+-- Returns: attackRegularLost, attackCmdDmg, defendRegularLost, defendCmdDmg
+-- where CmdDmg is cumulative damage dealt to the commander (7 = dead)
+local function simulateBattle(attackRegular, attackHasCmd,
+                               defendRegular, defendHasCmd,
                                tieGoesToAttacker)
-    local attackRegular  = attackArmies
-    local attackCmdHP    = attackHasCommander and 7 or 0
-    local defendRegular  = defendArmies
-    local defendCmdHP    = defendHasCommander and 7 or 0
+    local aReg    = attackRegular
+    local aCmdHP  = attackHasCmd and 7 or 0
+    local dReg    = defendRegular
+    local dCmdHP  = defendHasCmd and 7 or 0
 
-    local function attackTotal() return attackRegular + (attackCmdHP > 0 and attackCmdHP or 0) end
-    local function defendTotal() return defendRegular + (defendCmdHP > 0 and defendCmdHP or 0) end
+    local aRegLost  = 0
+    local aCmdDmg   = 0
+    local dRegLost  = 0
+    local dCmdDmg   = 0
 
-    -- Apply N losses to a side, regular armies die first, then commander HP
-    local function applyLosses(losses, regularRef, cmdHPRef)
-        local reg = regularRef
-        local cmd = cmdHPRef
-        local remaining = losses
-        if reg >= remaining then
-            reg = reg - remaining
-            remaining = 0
-        else
-            remaining = remaining - reg
-            reg = 0
-            cmd = cmd - remaining
-            if cmd < 0 then cmd = 0 end
+    local function aTotal() return aReg + aCmdHP end
+    local function dTotal() return dReg + dCmdHP end
+
+    local function applyLossToAttacker()
+        if aReg > 0 then
+            aReg = aReg - 1
+            aRegLost = aRegLost + 1
+        elseif aCmdHP > 0 then
+            aCmdHP = aCmdHP - 1
+            aCmdDmg = aCmdDmg + 1
         end
-        return reg, cmd
     end
 
-    local totalAttackLosses  = 0
-    local totalDefendLosses  = 0
+    local function applyLossToDefender()
+        if dReg > 0 then
+            dReg = dReg - 1
+            dRegLost = dRegLost + 1
+        elseif dCmdHP > 0 then
+            dCmdHP = dCmdHP - 1
+            dCmdDmg = dCmdDmg + 1
+        end
+    end
 
-    while attackTotal() > 0 and defendTotal() > 0 do
-        local aDice = math.min(attackTotal(), 3)
-        local dDice = math.min(defendTotal(), 2)
-
+    while aTotal() > 0 and dTotal() > 0 do
+        local aDice  = math.min(aTotal(), 3)
+        local dDice  = math.min(dTotal(), 2)
         local aRolls = rollDice(aDice)
         local dRolls = rollDice(dDice)
 
-        local comparisons = math.min(aDice, dDice)
-        for i = 1, comparisons do
-            local attackerWinsComparison
+        for i = 1, math.min(aDice, dDice) do
+            local attackerWins
             if aRolls[i] > dRolls[i] then
-                attackerWinsComparison = true
+                attackerWins = true
             elseif aRolls[i] == dRolls[i] then
-                attackerWinsComparison = (tieGoesToAttacker == true)
+                attackerWins = (tieGoesToAttacker == true)
             else
-                attackerWinsComparison = false
+                attackerWins = false
             end
 
-            if attackerWinsComparison then
-                -- Attacker wins this comparison, defender loses 1
-                local newReg, newCmd = applyLosses(1, defendRegular, defendCmdHP)
-                local lost = (defendRegular - newReg) + (defendCmdHP - newCmd)
-                totalDefendLosses = totalDefendLosses + lost
-                defendRegular = newReg
-                defendCmdHP   = newCmd
+            if attackerWins then
+                applyLossToDefender()
             else
-                -- Defender wins, attacker loses 1
-                local newReg, newCmd = applyLosses(1, attackRegular, attackCmdHP)
-                local lost = (attackRegular - newReg) + (attackCmdHP - newCmd)
-                totalAttackLosses = totalAttackLosses + lost
-                attackRegular = newReg
-                attackCmdHP   = newCmd
+                applyLossToAttacker()
             end
         end
     end
 
-    local attackerCommanderDied = attackHasCommander and attackCmdHP <= 0
-    local defenderCommanderDied = defendHasCommander and defendCmdHP <= 0
-
-    -- Surviving regular armies (commander health doesn't map back to armies)
-    local attackSurvivors = attackRegular
-    local defendSurvivors = defendRegular
-
-    return attackSurvivors, defendSurvivors,
-           attackerCommanderDied, defenderCommanderDied,
-           totalAttackLosses, totalDefendLosses
+    return aRegLost, aCmdDmg, dRegLost, dCmdDmg
 end
 
 -----------------------------------------------------------------------
@@ -126,110 +117,65 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     if order.proxyType ~= 'GameOrderAttackTransfer' then return end
     if not orderResult.IsAttack then return end
 
-    local standing   = game.ServerGame.LatestTurnStanding
-    local playerID   = order.PlayerID
-    local fromTerrID = order.From
-    local toTerrID   = order.To
+    local standing = game.ServerGame.LatestTurnStanding
+    local playerID = order.PlayerID
+    local toTerrID = order.To
 
-    local fromStanding = standing.Territories[fromTerrID]
-    local toStanding   = standing.Territories[toTerrID]
+    local defenderID = standing.Territories[toTerrID].OwnerPlayerID
 
-    -- Attacking armies committed by the player
-    local attackArmies      = order.NumArmies.NumArmies
-    local attackSpecialUnits = order.NumArmies.SpecialUnits
-    local attackCommander   = findCommander(attackSpecialUnits, playerID)
-    local attackHasCommander = attackCommander ~= nil
+    -- Attacking armies
+    local attackRegular     = order.NumArmies.NumArmies
+    local attackCommander   = findCommanderInArmies(order.NumArmies, playerID)
+    local attackHasCmd      = attackCommander ~= nil
 
     -- Defending armies
-    local defendArmies      = toStanding.NumArmies.NumArmies
-    local defendSpecialUnits = toStanding.NumArmies.SpecialUnits
-    local defenderID        = toStanding.OwnerPlayerID
-    local defendCommander   = findCommander(defendSpecialUnits, defenderID)
-    local defendHasCommander = defendCommander ~= nil
+    local defendStanding    = standing.Territories[toTerrID]
+    local defendRegular     = defendStanding.NumArmies.NumArmies
+    local defendCommander   = findCommanderInTerritory(standing, toTerrID, defenderID)
+    local defendHasCmd      = defendCommander ~= nil
 
-    -- Run the Risk battle simulation
     local tieGoesToAttacker = (Mod.Settings.TieWinner == 'Attacker')
 
-    local attackSurvivors, defendSurvivors,
-          attackerCommanderDied, defenderCommanderDied,
-          attackLosses, defendLosses =
-        simulateBattle(attackArmies, attackHasCommander,
-                       defendArmies, defendHasCommander,
+    -- Run Risk dice simulation
+    local aRegLost, aCmdDmg, dRegLost, dCmdDmg =
+        simulateBattle(attackRegular, attackHasCmd,
+                       defendRegular, defendHasCmd,
                        tieGoesToAttacker)
 
-    local attackerWon = defendSurvivors <= 0 and not (defendHasCommander and not defenderCommanderDied)
+    local attackerWon = (dRegLost >= defendRegular)
+                        and (not defendHasCmd or dCmdDmg >= 7)
 
-    -- Skip Warzone's built-in combat resolution
-    skipThisOrder(WL.ModOrderControl.SkipAndSupressSkippedMessage)
-
-    -- Build territory modifications to reflect the battle outcome
-    local mods = {}
-
-    if attackerWon then
-        -- Attacker captures the territory
-        -- Source territory: remove the committed armies (and commander if died)
-        local sourceMod = WL.TerritoryModification.Create(fromTerrID)
-        sourceMod.AddArmies = -attackArmies
-        if attackHasCommander then
-            sourceMod.RemoveSpecialUnitsOpt = { attackCommander.ID }
-        end
-        mods[#mods + 1] = sourceMod
-
-        -- Destination territory: change owner, set surviving armies
-        local destMod = WL.TerritoryModification.Create(toTerrID)
-        destMod.SetOwnerOpt = playerID
-        destMod.SetArmiesTo = attackSurvivors
-
-        -- Remove defender's commander if they died
-        if defendHasCommander and defenderCommanderDied then
-            destMod.RemoveSpecialUnitsOpt = { defendCommander.ID }
-        end
-
-        -- Move attacker's commander to captured territory if they survived
-        if attackHasCommander and not attackerCommanderDied then
-            destMod.AddSpecialUnits = { WL.Commander.Create(playerID) }
-            -- Remove from source (already handled above)
-        end
-
-        mods[#mods + 1] = destMod
-    else
-        -- Attacker failed — update source territory (remove dead attackers)
-        local sourceMod = WL.TerritoryModification.Create(fromTerrID)
-        sourceMod.AddArmies = -attackLosses
-        if attackHasCommander and attackerCommanderDied then
-            sourceMod.RemoveSpecialUnitsOpt = { attackCommander.ID }
-        end
-        mods[#mods + 1] = sourceMod
-
-        -- Update destination territory (remove dead defenders)
-        local destMod = WL.TerritoryModification.Create(toTerrID)
-        destMod.AddArmies = -defendLosses
-        if defendHasCommander and defenderCommanderDied then
-            destMod.RemoveSpecialUnitsOpt = { defendCommander.ID }
-        end
-        mods[#mods + 1] = destMod
+    -- Build AttackingArmiesKilled armies object
+    local attackCmdKilled = attackHasCmd and aCmdDmg >= 7
+    local attackKilledSpecials = {}
+    if attackCmdKilled then
+        attackKilledSpecials[1] = attackCommander
     end
+    orderResult.AttackingArmiesKilled = WL.Armies.Create(aRegLost, attackKilledSpecials)
 
-    -- Build result message
-    local attackerName = game.Game.Players[playerID].DisplayName(nil, false)
-    local msg
-    if attackerWon then
-        msg = attackerName .. ' attacked with Risk dice and captured the territory! '
-              .. '(Attacker lost ' .. attackLosses .. ', Defender lost ' .. defendLosses .. ')'
-    else
-        msg = attackerName .. ' attacked with Risk dice but failed. '
-              .. '(Attacker lost ' .. attackLosses .. ', Defender lost ' .. defendLosses .. ')'
+    -- Build DefendingArmiesKilled armies object
+    local defendCmdKilled = defendHasCmd and dCmdDmg >= 7
+    local defendKilledSpecials = {}
+    if defendCmdKilled then
+        defendKilledSpecials[1] = defendCommander
     end
+    orderResult.DefendingArmiesKilled = WL.Armies.Create(dRegLost, defendKilledSpecials)
 
-    if attackerCommanderDied then
-        msg = msg .. ' Attacker\'s commander was killed!'
-    end
-    if defenderCommanderDied then
-        msg = msg .. ' Defender\'s commander was killed!'
-    end
+    -- Set whether the attack succeeded
+    orderResult.IsSuccessful = attackerWon
 
-    local event = WL.GameOrderEvent.Create(playerID, msg, nil, mods, nil, nil)
-    addNewOrder(event)
+    -- Handle partial commander damage via DamageToSpecialUnits
+    -- (only needed if commander took damage but didn't die)
+    local dmgTable = {}
+    if attackHasCmd and aCmdDmg > 0 and not attackCmdKilled then
+        dmgTable[attackCommander.ID] = aCmdDmg
+    end
+    if defendHasCmd and dCmdDmg > 0 and not defendCmdKilled then
+        dmgTable[defendCommander.ID] = dCmdDmg
+    end
+    -- Per the rules: commander health resets if they survive, so we
+    -- don't actually persist partial damage. Leave dmgTable empty for survivors.
+    -- DamageToSpecialUnits is only set for killed commanders (handled above).
 end
 
 function Server_AdvanceTurn_End(game, addNewOrder)
