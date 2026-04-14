@@ -25,12 +25,13 @@ local function findCommanderInTerritory(standing, terrID, ownerID)
     return findCommanderInArmies(ts.NumArmies, ownerID)
 end
 
-local _seedCounter = 0
-local function rollDice(n, sides)
+local _rollCounter = 0
+
+local function rollDice(n, sides, seedBase)
     local rolls = {}
     for i = 1, n do
-        _seedCounter = _seedCounter + 1
-        math.randomseed(os.time() * 1000 + _seedCounter * 7 + i * 13)
+        _rollCounter = _rollCounter + 1
+        math.randomseed(seedBase + _rollCounter * 999983 + i * 49999)
         rolls[i] = math.random(1, sides)
     end
     table.sort(rolls, function(a, b) return a > b end)
@@ -49,7 +50,7 @@ end
 -- Simulate a full Risk battle, returning results and a verbose log.
 local function simulateBattle(attackRegular, attackHasCmd,
                                defendRegular, defendHasCmd,
-                               tieGoesToAttacker, diceSides)
+                               tieGoesToAttacker, diceSides, seedBase)
     local aReg   = attackRegular
     local aCmdHP = attackHasCmd and 7 or 0
     local dReg   = defendRegular
@@ -85,8 +86,8 @@ local function simulateBattle(attackRegular, attackHasCmd,
         round = round + 1
         local aDice  = math.min(aTotal(), 3)
         local dDice  = math.min(dTotal(), 2)
-        local aRolls = rollDice(aDice, diceSides)
-        local dRolls = rollDice(dDice, diceSides)
+        local aRolls = rollDice(aDice, diceSides, seedBase)
+        local dRolls = rollDice(dDice, diceSides, seedBase)
 
         local aLostThisRound = 0
         local dLostThisRound = 0
@@ -161,10 +162,19 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
 
 
 
+    -- Build a seed from values that vary per attack
+    local turnNum   = game.Game.NumberOfTurns
+    local fromTerrID = order.From
+    local seedBase  = turnNum * 1000000
+                    + fromTerrID * 7919
+                    + toTerrID * 6271
+                    + attackRegular * 1009
+                    + defendRegular * 877
+
     local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log =
         simulateBattle(attackRegular, attackHasCmd,
                        defendRegular, defendHasCmd,
-                       tieGoesToAttacker, diceSides)
+                       tieGoesToAttacker, diceSides, seedBase)
 
     local attackCmdKilled  = attackHasCmd and aCmdDmg >= 7
     local defendCmdKilled  = defendHasCmd and dCmdDmg >= 7
