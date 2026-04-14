@@ -8,7 +8,7 @@ function Client_PresentConfigureUI(rootParent)
         .SetColor('#FFD700')
 
     UI.CreateLabel(vert)
-        .SetText('Replaces Warzone combat with Risk-style dice. Battles are fought to completion.\n\nWho wins on a tie roll?')
+        .SetText('Who wins on a tie roll?')
 
     local group = UI.CreateRadioButtonGroup(vert)
 
@@ -20,13 +20,22 @@ function Client_PresentConfigureUI(rootParent)
         .SetGroup(group)
         .SetText('Attacker wins ties')
 
-    -- Restore saved setting
     if Mod.Settings.TieWinner == 'Attacker' then
         rbAttacker.SetIsChecked(true)
     else
         rbDefender.SetIsChecked(true)
     end
 
-    _RiskMod_rbDefender = rbDefender
-    _RiskMod_rbAttacker = rbAttacker
+    UI.CreateLabel(vert)
+        .SetText('Number of sides on each die (default: 6)')
+
+    local diceSidesInput = UI.CreateNumberInputField(vert)
+        .SetValue(tonumber(Mod.Settings.DiceSides) or 6)
+        .SetWholeNumbers(true)
+        .SetSliderMinValue(2)
+        .SetSliderMaxValue(20)
+
+    _RiskMod_rbDefender    = rbDefender
+    _RiskMod_rbAttacker    = rbAttacker
+    _RiskMod_diceSidesInput = diceSidesInput
 end

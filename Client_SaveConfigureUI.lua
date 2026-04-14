@@ -6,4 +6,11 @@ function Client_SaveConfigureUI(alert, addCard)
     else
         Mod.Settings.TieWinner = 'Defender'
     end
+
+    local sides = math.floor(_RiskMod_diceSidesInput.GetValue())
+    if sides < 2 then
+        alert('Dice must have at least 2 sides.')
+        return
+    end
+    Mod.Settings.DiceSides = sides
 end

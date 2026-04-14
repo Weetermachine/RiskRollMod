@@ -36,9 +36,9 @@ local function findCommanderInTerritory(standing, terrID, ownerID)
 end
 
 -- Roll N dice, return sorted descending
-local function rollDice(n)
+local function rollDice(n, sides)
     local rolls = {}
-    for i = 1, n do rolls[i] = math.random(1, 6) end
+    for i = 1, n do rolls[i] = math.random(1, sides) end
     table.sort(rolls, function(a, b) return a > b end)
     return rolls
 end
@@ -48,7 +48,7 @@ end
 -- where CmdDmg is cumulative damage dealt to the commander (7 = dead)
 local function simulateBattle(attackRegular, attackHasCmd,
                                defendRegular, defendHasCmd,
-                               tieGoesToAttacker)
+                               tieGoesToAttacker, diceSides)
     local aReg    = attackRegular
     local aCmdHP  = attackHasCmd and 7 or 0
     local dReg    = defendRegular
@@ -85,8 +85,8 @@ local function simulateBattle(attackRegular, attackHasCmd,
     while aTotal() > 0 and dTotal() > 0 do
         local aDice  = math.min(aTotal(), 3)
         local dDice  = math.min(dTotal(), 2)
-        local aRolls = rollDice(aDice)
-        local dRolls = rollDice(dDice)
+        local aRolls = rollDice(aDice, diceSides)
+        local dRolls = rollDice(dDice, diceSides)
 
         for i = 1, math.min(aDice, dDice) do
             local attackerWins
@@ -135,12 +135,14 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local defendHasCmd      = defendCommander ~= nil
 
     local tieGoesToAttacker = (Mod.Settings.TieWinner == 'Attacker')
+    local diceSides = tonumber(Mod.Settings.DiceSides) or 6
+    if diceSides < 2 then diceSides = 2 end
 
     -- Run Risk dice simulation
     local aRegLost, aCmdDmg, dRegLost, dCmdDmg =
         simulateBattle(attackRegular, attackHasCmd,
                        defendRegular, defendHasCmd,
-                       tieGoesToAttacker)
+                       tieGoesToAttacker, diceSides)
 
     local attackerWon = (dRegLost >= defendRegular)
                         and (not defendHasCmd or dCmdDmg >= 7)
@@ -162,11 +164,11 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     orderResult.DefendingArmiesKilled = WL.Armies.Create(dRegLost, defendKilledSpecials)
 
     -- Emit a visible message showing the Risk dice outcome
-    local resultMsg = '[Risk Dice] Attacker lost ' .. aRegLost .. ' armies'
-    if attackCmdKilled then resultMsg = resultMsg .. ' + commander KILLED' end
-    resultMsg = resultMsg .. ', Defender lost ' .. dRegLost .. ' armies'
-    if defendCmdKilled then resultMsg = resultMsg .. ' + commander KILLED' end
-    resultMsg = resultMsg .. '. Warzone result: ' .. tostring(orderResult.IsSuccessful)
+    local attackerName = game.Game.Players[playerID].DisplayName(nil, false)
+    local resultMsg = attackerName .. ' rolled Risk dice: lost ' .. aRegLost
+    if attackCmdKilled then resultMsg = resultMsg .. ' armies + commander' end
+    resultMsg = resultMsg .. ', defender lost ' .. dRegLost
+    if defendCmdKilled then resultMsg = resultMsg .. ' armies + commander' else resultMsg = resultMsg .. ' armies' end
 
     local event = WL.GameOrderEvent.Create(playerID, resultMsg, nil, nil, nil, nil)
     addNewOrder(event, true)
