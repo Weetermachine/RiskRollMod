@@ -13,4 +13,18 @@ function Client_SaveConfigureUI(alert, addCard)
         return
     end
     Mod.Settings.DiceSides = sides
+
+    local attackDice = math.floor(_RiskMod_attackDiceInput.GetValue())
+    if attackDice < 1 then
+        alert('Attacker must have at least 1 die.')
+        return
+    end
+    Mod.Settings.MaxAttackDice = attackDice
+
+    local defendDice = math.floor(_RiskMod_defendDiceInput.GetValue())
+    if defendDice < 1 then
+        alert('Defender must have at least 1 die.')
+        return
+    end
+    Mod.Settings.MaxDefendDice = defendDice
 end

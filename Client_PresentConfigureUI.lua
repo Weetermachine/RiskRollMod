@@ -36,10 +36,30 @@ function Client_PresentConfigureUI(rootParent)
         .SetSliderMaxValue(20)
 
     UI.CreateLabel(vert)
+        .SetText('Max attacker dice (default: 3)')
+
+    local attackDiceInput = UI.CreateNumberInputField(vert)
+        .SetValue(tonumber(Mod.Settings.MaxAttackDice) or 3)
+        .SetWholeNumbers(true)
+        .SetSliderMinValue(1)
+        .SetSliderMaxValue(10)
+
+    UI.CreateLabel(vert)
+        .SetText('Max defender dice (default: 2)')
+
+    local defendDiceInput = UI.CreateNumberInputField(vert)
+        .SetValue(tonumber(Mod.Settings.MaxDefendDice) or 2)
+        .SetWholeNumbers(true)
+        .SetSliderMinValue(1)
+        .SetSliderMaxValue(10)
+
+    UI.CreateLabel(vert)
         .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')
         .SetColor('#FF8C00')
 
-    _RiskMod_rbDefender     = rbDefender
-    _RiskMod_rbAttacker     = rbAttacker
-    _RiskMod_diceSidesInput = diceSidesInput
+    _RiskMod_rbDefender      = rbDefender
+    _RiskMod_rbAttacker      = rbAttacker
+    _RiskMod_diceSidesInput  = diceSidesInput
+    _RiskMod_attackDiceInput = attackDiceInput
+    _RiskMod_defendDiceInput = defendDiceInput
 end

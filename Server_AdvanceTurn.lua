@@ -59,7 +59,8 @@ end
 -- Simulate a full Risk battle, returning results and a verbose log.
 local function simulateBattle(attackRegular, attackHasCmd,
                                defendRegular, defendHasCmd,
-                               tieGoesToAttacker, diceSides)
+                               tieGoesToAttacker, diceSides,
+                               maxAttackDice, maxDefendDice)
     local aReg   = attackRegular
     local aCmdHP = attackHasCmd and 7 or 0
     local dReg   = defendRegular
@@ -91,12 +92,33 @@ local function simulateBattle(attackRegular, attackHasCmd,
     end
 
     local round = 0
+    local prevARolls = nil
+    local prevDRolls = nil
+
+    local function rollsMatch(a, b)
+        if a == nil or b == nil or #a ~= #b then return false end
+        for i = 1, #a do if a[i] ~= b[i] then return false end end
+        return true
+    end
+
     while aTotal() > 0 and dTotal() > 0 do
         round = round + 1
-        local aDice  = math.min(aTotal(), 3)
-        local dDice  = math.min(dTotal(), 2)
+        local aDice = math.min(aTotal(), maxAttackDice)
+        local dDice = math.min(dTotal(), maxDefendDice)
+
+        -- Reroll each side independently up to 3 times if it matches previous round
         local aRolls = rollDice(aDice, diceSides)
+        for _ = 1, 3 do
+            if not rollsMatch(aRolls, prevARolls) then break end
+            aRolls = rollDice(aDice, diceSides)
+        end
         local dRolls = rollDice(dDice, diceSides)
+        for _ = 1, 3 do
+            if not rollsMatch(dRolls, prevDRolls) then break end
+            dRolls = rollDice(dDice, diceSides)
+        end
+        prevARolls = aRolls
+        prevDRolls = dRolls
 
         local aLostThisRound = 0
         local dLostThisRound = 0
@@ -166,15 +188,18 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local defendHasCmd    = defendCommander ~= nil
 
     local tieGoesToAttacker = (Mod.Settings.TieWinner == 'Attacker')
-    local diceSides = tonumber(Mod.Settings.DiceSides) or 6
-    if diceSides < 2 then diceSides = 2 end
-
-
+    local diceSides     = tonumber(Mod.Settings.DiceSides)     or 6
+    local maxAttackDice = tonumber(Mod.Settings.MaxAttackDice) or 3
+    local maxDefendDice = tonumber(Mod.Settings.MaxDefendDice) or 2
+    if diceSides < 2     then diceSides = 2     end
+    if maxAttackDice < 1 then maxAttackDice = 1 end
+    if maxDefendDice < 1 then maxDefendDice = 1 end
 
     local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log =
         simulateBattle(attackRegular, attackHasCmd,
                        defendRegular, defendHasCmd,
-                       tieGoesToAttacker, diceSides)
+                       tieGoesToAttacker, diceSides,
+                       maxAttackDice, maxDefendDice)
 
     local attackCmdKilled  = attackHasCmd and aCmdDmg >= 7
     local defendCmdKilled  = defendHasCmd and dCmdDmg >= 7
