@@ -145,6 +145,14 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local attackerWon = (dRegLost >= defendRegular)
                         and (not defendHasCmd or dCmdDmg >= 7)
 
+    -- DIAGNOSTIC: dump writable keys on orderResult
+    local wk = orderResult.writableKeys
+    local keys = ''
+    if wk ~= nil then
+        for _, k in ipairs(wk) do keys = keys .. k .. ',' end
+    end
+    error('RISK_DIAG | writableKeys=' .. keys)
+
     -- Build AttackingArmiesKilled armies object
     local attackCmdKilled = attackHasCmd and aCmdDmg >= 7
     local attackKilledSpecials = {}
@@ -160,9 +168,6 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
         defendKilledSpecials[1] = defendCommander
     end
     orderResult.DefendingArmiesKilled = WL.Armies.Create(dRegLost, defendKilledSpecials)
-
-    -- Set whether the attack succeeded
-    orderResult.IsSuccessful = attackerWon
 
     -- Handle partial commander damage via DamageToSpecialUnits
     -- (only needed if commander took damage but didn't die)
