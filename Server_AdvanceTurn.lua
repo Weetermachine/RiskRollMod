@@ -145,14 +145,6 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local attackerWon = (dRegLost >= defendRegular)
                         and (not defendHasCmd or dCmdDmg >= 7)
 
-    -- DIAGNOSTIC: dump writable keys on orderResult
-    local wk = orderResult.writableKeys
-    local keys = ''
-    if wk ~= nil then
-        for _, k in ipairs(wk) do keys = keys .. k .. ',' end
-    end
-    error('RISK_DIAG | writableKeys=' .. keys)
-
     -- Build AttackingArmiesKilled armies object
     local attackCmdKilled = attackHasCmd and aCmdDmg >= 7
     local attackKilledSpecials = {}
