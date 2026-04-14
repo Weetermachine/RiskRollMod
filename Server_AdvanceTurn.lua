@@ -1,15 +1,5 @@
 -- Server_AdvanceTurn.lua
 -- "Risk Dice Rolls" mod
---
--- Replaces Warzone's combat math with Risk-style dice by modifying the
--- order result in place. This lets Warzone handle captures, card awards,
--- elimination, and special unit death naturally.
---
--- We run our own dice simulation, then set:
---   orderResult.AttackingArmiesKilled
---   orderResult.DefendingArmiesKilled
---   orderResult.IsSuccessful
---   orderResult.DamageToSpecialUnits (for commanders)
 
 function Server_AdvanceTurn_Start(game, addNewOrder)
 end
@@ -35,7 +25,6 @@ local function findCommanderInTerritory(standing, terrID, ownerID)
     return findCommanderInArmies(ts.NumArmies, ownerID)
 end
 
--- Roll N dice, return sorted descending
 local function rollDice(n, sides)
     local rolls = {}
     for i = 1, n do rolls[i] = math.random(1, sides) end
@@ -43,50 +32,59 @@ local function rollDice(n, sides)
     return rolls
 end
 
--- Simulate a full Risk battle.
--- Returns: attackRegularLost, attackCmdDmg, defendRegularLost, defendCmdDmg
--- where CmdDmg is cumulative damage dealt to the commander (7 = dead)
+local function joinNums(t)
+    local s = ''
+    for i, v in ipairs(t) do
+        if i > 1 then s = s .. ', ' end
+        s = s .. tostring(v)
+    end
+    return s
+end
+
+-- Simulate a full Risk battle, returning results and a verbose log.
 local function simulateBattle(attackRegular, attackHasCmd,
                                defendRegular, defendHasCmd,
                                tieGoesToAttacker, diceSides)
-    local aReg    = attackRegular
-    local aCmdHP  = attackHasCmd and 7 or 0
-    local dReg    = defendRegular
-    local dCmdHP  = defendHasCmd and 7 or 0
+    local aReg   = attackRegular
+    local aCmdHP = attackHasCmd and 7 or 0
+    local dReg   = defendRegular
+    local dCmdHP = defendHasCmd and 7 or 0
 
-    local aRegLost  = 0
-    local aCmdDmg   = 0
-    local dRegLost  = 0
-    local dCmdDmg   = 0
+    local aRegLost = 0
+    local aCmdDmg  = 0
+    local dRegLost = 0
+    local dCmdDmg  = 0
+    local log      = {}
 
     local function aTotal() return aReg + aCmdHP end
     local function dTotal() return dReg + dCmdHP end
 
     local function applyLossToAttacker()
         if aReg > 0 then
-            aReg = aReg - 1
-            aRegLost = aRegLost + 1
+            aReg = aReg - 1; aRegLost = aRegLost + 1
         elseif aCmdHP > 0 then
-            aCmdHP = aCmdHP - 1
-            aCmdDmg = aCmdDmg + 1
+            aCmdHP = aCmdHP - 1; aCmdDmg = aCmdDmg + 1
         end
     end
 
     local function applyLossToDefender()
         if dReg > 0 then
-            dReg = dReg - 1
-            dRegLost = dRegLost + 1
+            dReg = dReg - 1; dRegLost = dRegLost + 1
         elseif dCmdHP > 0 then
-            dCmdHP = dCmdHP - 1
-            dCmdDmg = dCmdDmg + 1
+            dCmdHP = dCmdHP - 1; dCmdDmg = dCmdDmg + 1
         end
     end
 
+    local round = 0
     while aTotal() > 0 and dTotal() > 0 do
+        round = round + 1
         local aDice  = math.min(aTotal(), 3)
         local dDice  = math.min(dTotal(), 2)
         local aRolls = rollDice(aDice, diceSides)
         local dRolls = rollDice(dDice, diceSides)
+
+        local aLostThisRound = 0
+        local dLostThisRound = 0
 
         for i = 1, math.min(aDice, dDice) do
             local attackerWins
@@ -97,16 +95,38 @@ local function simulateBattle(attackRegular, attackHasCmd,
             else
                 attackerWins = false
             end
-
             if attackerWins then
                 applyLossToDefender()
+                dLostThisRound = dLostThisRound + 1
             else
                 applyLossToAttacker()
+                aLostThisRound = aLostThisRound + 1
             end
         end
+
+        -- Build round log line
+        local line = 'Round ' .. round .. ': '
+                  .. 'Attacker rolled [' .. joinNums(aRolls) .. '] '
+                  .. 'Defender rolled [' .. joinNums(dRolls) .. '] — '
+                  .. aLostThisRound .. ' attacker, '
+                  .. dLostThisRound .. ' defender killed. '
+                  .. '(Attackers remaining: ' .. aTotal() .. ', '
+                  .. 'Defenders remaining: ' .. dTotal() .. ')'
+        log[#log + 1] = line
     end
 
-    return aRegLost, aCmdDmg, dRegLost, dCmdDmg
+    -- Trim to first 10 and last 10 rounds if log is long
+    local trimmedLog
+    if #log <= 20 then
+        trimmedLog = log
+    else
+        trimmedLog = {}
+        for i = 1, 10 do trimmedLog[#trimmedLog + 1] = log[i] end
+        trimmedLog[#trimmedLog + 1] = '... (' .. (#log - 20) .. ' rounds omitted) ...'
+        for i = #log - 9, #log do trimmedLog[#trimmedLog + 1] = log[i] end
+    end
+
+    return aRegLost, aCmdDmg, dRegLost, dCmdDmg, trimmedLog
 end
 
 -----------------------------------------------------------------------
@@ -117,64 +137,51 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     if order.proxyType ~= 'GameOrderAttackTransfer' then return end
     if not orderResult.IsAttack then return end
 
-    local standing = game.ServerGame.LatestTurnStanding
-    local playerID = order.PlayerID
-    local toTerrID = order.To
-
+    local standing  = game.ServerGame.LatestTurnStanding
+    local playerID  = order.PlayerID
+    local toTerrID  = order.To
     local defenderID = standing.Territories[toTerrID].OwnerPlayerID
 
-    -- Attacking armies
-    local attackRegular     = order.NumArmies.NumArmies
-    local attackCommander   = findCommanderInArmies(order.NumArmies, playerID)
-    local attackHasCmd      = attackCommander ~= nil
+    local attackRegular   = order.NumArmies.NumArmies
+    local attackCommander = findCommanderInArmies(order.NumArmies, playerID)
+    local attackHasCmd    = attackCommander ~= nil
 
-    -- Defending armies
-    local defendStanding    = standing.Territories[toTerrID]
-    local defendRegular     = defendStanding.NumArmies.NumArmies
-    local defendCommander   = findCommanderInTerritory(standing, toTerrID, defenderID)
-    local defendHasCmd      = defendCommander ~= nil
+    local defendRegular   = standing.Territories[toTerrID].NumArmies.NumArmies
+    local defendCommander = findCommanderInTerritory(standing, toTerrID, defenderID)
+    local defendHasCmd    = defendCommander ~= nil
 
     local tieGoesToAttacker = (Mod.Settings.TieWinner == 'Attacker')
     local diceSides = tonumber(Mod.Settings.DiceSides) or 6
     if diceSides < 2 then diceSides = 2 end
 
-    -- Run Risk dice simulation
-    local aRegLost, aCmdDmg, dRegLost, dCmdDmg =
+    local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log =
         simulateBattle(attackRegular, attackHasCmd,
                        defendRegular, defendHasCmd,
                        tieGoesToAttacker, diceSides)
 
-    local attackerWon = (dRegLost >= defendRegular)
-                        and (not defendHasCmd or dCmdDmg >= 7)
+    local attackCmdKilled  = attackHasCmd and aCmdDmg >= 7
+    local defendCmdKilled  = defendHasCmd and dCmdDmg >= 7
 
-    -- Build AttackingArmiesKilled armies object
-    local attackCmdKilled = attackHasCmd and aCmdDmg >= 7
     local attackKilledSpecials = {}
-    if attackCmdKilled then
-        attackKilledSpecials[1] = attackCommander
-    end
+    if attackCmdKilled then attackKilledSpecials[1] = attackCommander end
     orderResult.AttackingArmiesKilled = WL.Armies.Create(aRegLost, attackKilledSpecials)
 
-    -- Build DefendingArmiesKilled armies object
-    local defendCmdKilled = defendHasCmd and dCmdDmg >= 7
     local defendKilledSpecials = {}
-    if defendCmdKilled then
-        defendKilledSpecials[1] = defendCommander
-    end
+    if defendCmdKilled then defendKilledSpecials[1] = defendCommander end
     orderResult.DefendingArmiesKilled = WL.Armies.Create(dRegLost, defendKilledSpecials)
 
-    -- Emit a visible message showing the Risk dice outcome.
-    -- Only show to players who can see the territory: attacker, defender,
-    -- and any teammate of either (they share vision).
-    -- We build the visible-to list from players on the same team as attacker or defender.
+    -- Build verbose message
     local attackerName = game.Game.Players[playerID].DisplayName(nil, false)
-    local resultMsg = attackerName .. ' rolled Risk dice: lost ' .. aRegLost
-    if attackCmdKilled then resultMsg = resultMsg .. ' armies + commander' end
-    resultMsg = resultMsg .. ', defender lost ' .. dRegLost
-    if defendCmdKilled then resultMsg = resultMsg .. ' armies + commander' else resultMsg = resultMsg .. ' armies' end
+    local summary = attackerName .. ' attacked with Risk dice ('
+                 .. attackRegular .. (attackHasCmd and '+CMD' or '') .. ' vs '
+                 .. defendRegular .. (defendHasCmd and '+CMD' or '') .. '):\n'
+    local fullMsg = summary .. table.concat(log, '\n')
 
-    -- Only show to the attacker and defender
-    local event = WL.GameOrderEvent.Create(playerID, resultMsg, { playerID, defenderID }, nil, nil, nil)
+    -- Append commander death notes
+    if attackCmdKilled then fullMsg = fullMsg .. '\nAttacker\'s commander was killed!' end
+    if defendCmdKilled then fullMsg = fullMsg .. '\nDefender\'s commander was killed!' end
+
+    local event = WL.GameOrderEvent.Create(playerID, fullMsg, { playerID, defenderID }, nil, nil, nil)
     addNewOrder(event, true)
 end
 
