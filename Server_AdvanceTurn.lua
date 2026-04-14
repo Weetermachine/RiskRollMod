@@ -60,7 +60,8 @@ end
 local function simulateBattle(attackRegular, attackHasCmd,
                                defendRegular, defendHasCmd,
                                tieGoesToAttacker, diceSides,
-                               maxAttackDice, maxDefendDice)
+                               maxAttackDice, maxDefendDice,
+                               retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct)
     local aReg   = attackRegular
     local aCmdHP = attackHasCmd and 7 or 0
     local dReg   = defendRegular
@@ -90,6 +91,10 @@ local function simulateBattle(attackRegular, attackHasCmd,
             dCmdHP = dCmdHP - 1; dCmdDmg = dCmdDmg + 1
         end
     end
+
+    local initialADice = math.min(attackRegular + (attackHasCmd and 7 or 0), maxAttackDice)
+    local initialDDice = math.min(defendRegular + (defendHasCmd and 7 or 0), maxDefendDice)
+    local retreated = false
 
     local round = 0
     local prevARolls = nil
@@ -141,6 +146,28 @@ local function simulateBattle(attackRegular, attackHasCmd,
             end
         end
 
+        -- Rule 1: retreat if attacker dice <= defender dice, unless they
+        -- started at or below parity (deliberate underdog attack).
+        if retreatOnDiceParity and initialADice > initialDDice then
+            local curADice = math.min(aTotal(), maxAttackDice)
+            local curDDice = math.min(dTotal(), maxDefendDice)
+            if curADice <= curDDice then
+                retreated = true
+                log[#log + 1] = '[Retreat: attacker dice dropped to ' .. curADice .. ' vs defender ' .. curDDice .. ']'
+                break
+            end
+        end
+
+        -- Rule 2: retreat if attacker has lost X% more than defender after 3+ rounds
+        if retreatOnLossRatio and round >= 3 and dRegLost > 0 then
+            local lossRatio = (aRegLost / dRegLost - 1) * 100
+            if lossRatio >= retreatLossRatioPct then
+                retreated = true
+                log[#log + 1] = '[Retreat: attacker losses ' .. math.floor(lossRatio) .. '% greater than defender]'
+                break
+            end
+        end
+
         -- Build round log line
         -- Compact format: R1: A[6,2,1] D[3,3] -1a -1d (A:9 D:7)
         local line = 'R' .. round .. ': '
@@ -163,7 +190,7 @@ local function simulateBattle(attackRegular, attackHasCmd,
         for i = #log - 9, #log do trimmedLog[#trimmedLog + 1] = log[i] end
     end
 
-    return aRegLost, aCmdDmg, dRegLost, dCmdDmg, trimmedLog
+    return aRegLost, aCmdDmg, dRegLost, dCmdDmg, trimmedLog, retreated
 end
 
 -----------------------------------------------------------------------
@@ -187,27 +214,30 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local attackCommander = findCommanderInArmies(actualArmies, playerID)
     local attackHasCmd    = attackCommander ~= nil
 
-    -- If no armies and no commander are available, let Warzone handle it
-    -- naturally (it will skip the order) rather than showing a 0v? result.
-    if attackRegular == 0 and not attackHasCmd then return end
+
 
     local defendRegular   = standing.Territories[toTerrID].NumArmies.NumArmies
     local defendCommander = findCommanderInTerritory(standing, toTerrID, defenderID)
     local defendHasCmd    = defendCommander ~= nil
 
-    local tieGoesToAttacker = (Mod.Settings.TieWinner == 'Attacker')
-    local diceSides     = tonumber(Mod.Settings.DiceSides)     or 6
-    local maxAttackDice = tonumber(Mod.Settings.MaxAttackDice) or 3
-    local maxDefendDice = tonumber(Mod.Settings.MaxDefendDice) or 2
-    if diceSides < 2     then diceSides = 2     end
-    if maxAttackDice < 1 then maxAttackDice = 1 end
-    if maxDefendDice < 1 then maxDefendDice = 1 end
+    local tieGoesToAttacker  = (Mod.Settings.TieWinner == 'Attacker')
+    local diceSides          = tonumber(Mod.Settings.DiceSides)          or 6
+    local maxAttackDice      = tonumber(Mod.Settings.MaxAttackDice)      or 3
+    local maxDefendDice      = tonumber(Mod.Settings.MaxDefendDice)      or 2
+    local retreatOnDiceParity = Mod.Settings.RetreatOnDiceParity ~= false
+    local retreatOnLossRatio  = Mod.Settings.RetreatOnLossRatio  ~= false
+    local retreatLossRatioPct = tonumber(Mod.Settings.RetreatLossRatioPct) or 50
+    if diceSides < 2          then diceSides = 2          end
+    if maxAttackDice < 1      then maxAttackDice = 1      end
+    if maxDefendDice < 1      then maxDefendDice = 1      end
+    if retreatLossRatioPct < 1 then retreatLossRatioPct = 1 end
 
-    local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log =
+    local aRegLost, aCmdDmg, dRegLost, dCmdDmg, log, retreated =
         simulateBattle(attackRegular, attackHasCmd,
                        defendRegular, defendHasCmd,
                        tieGoesToAttacker, diceSides,
-                       maxAttackDice, maxDefendDice)
+                       maxAttackDice, maxDefendDice,
+                       retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct)
 
     local attackCmdKilled  = attackHasCmd and aCmdDmg >= 7
     local defendCmdKilled  = defendHasCmd and dCmdDmg >= 7
@@ -228,6 +258,7 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local fullMsg = summary .. table.concat(log, '\n')
 
     -- Append commander death notes
+    if retreated then fullMsg = fullMsg .. '\n[Attacker retreated]' end
     if attackCmdKilled then fullMsg = fullMsg .. '\n[Attacker CMD died]' end
     if defendCmdKilled then fullMsg = fullMsg .. '\n[Defender CMD died]' end
 

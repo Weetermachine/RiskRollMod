@@ -54,6 +54,27 @@ function Client_PresentConfigureUI(rootParent)
         .SetSliderMaxValue(10)
 
     UI.CreateLabel(vert)
+        .SetText('Retreat Rules')
+        .SetColor('#FFD700')
+
+    local cbDiceParity = UI.CreateCheckBox(vert)
+        .SetText('Retreat when attacker dice drops to defender dice (unless started at parity)')
+        .SetIsChecked(Mod.Settings.RetreatOnDiceParity ~= false)
+
+    local cbLossRatio = UI.CreateCheckBox(vert)
+        .SetText('Retreat when attacker losses exceed defender losses by X% (after 3 rounds)')
+        .SetIsChecked(Mod.Settings.RetreatOnLossRatio ~= false)
+
+    UI.CreateLabel(vert)
+        .SetText('Loss ratio threshold % (default: 50)')
+
+    local lossRatioInput = UI.CreateNumberInputField(vert)
+        .SetValue(tonumber(Mod.Settings.RetreatLossRatioPct) or 50)
+        .SetWholeNumbers(true)
+        .SetSliderMinValue(1)
+        .SetSliderMaxValue(500)
+
+    UI.CreateLabel(vert)
         .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')
         .SetColor('#FF8C00')
 
@@ -62,4 +83,7 @@ function Client_PresentConfigureUI(rootParent)
     _RiskMod_diceSidesInput  = diceSidesInput
     _RiskMod_attackDiceInput = attackDiceInput
     _RiskMod_defendDiceInput = defendDiceInput
+    _RiskMod_cbDiceParity    = cbDiceParity
+    _RiskMod_cbLossRatio     = cbLossRatio
+    _RiskMod_lossRatioInput  = lossRatioInput
 end

@@ -27,4 +27,14 @@ function Client_SaveConfigureUI(alert, addCard)
         return
     end
     Mod.Settings.MaxDefendDice = defendDice
+
+    Mod.Settings.RetreatOnDiceParity  = _RiskMod_cbDiceParity.GetIsChecked()
+    Mod.Settings.RetreatOnLossRatio   = _RiskMod_cbLossRatio.GetIsChecked()
+
+    local lossRatio = math.floor(_RiskMod_lossRatioInput.GetValue())
+    if lossRatio < 1 then
+        alert('Loss ratio threshold must be at least 1%.')
+        return
+    end
+    Mod.Settings.RetreatLossRatioPct = lossRatio
 end
