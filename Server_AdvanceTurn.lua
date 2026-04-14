@@ -174,7 +174,7 @@ local function simulateBattle(attackRegular, attackHasCmd,
             local lossRatio = (aRegLost / dRegLost - 1) * 100
             if lossRatio >= retreatLossRatioPct then
                 retreated = true
-                log[#log + 1] = '[Retreat: attacker losses ' .. math.floor(lossRatio) .. '% greater than defender (aLost=' .. aRegLost .. ' dLost=' .. dRegLost .. ')]'
+                log[#log + 1] = '[Retreat: attacker losses ' .. math.floor(lossRatio) .. '% greater than defender]'
                 break
             end
         end
@@ -182,13 +182,13 @@ local function simulateBattle(attackRegular, attackHasCmd,
 
     -- Trim to first 10 and last 10 rounds if log is long
     local trimmedLog
-    if #log <= 20 then
+    if #log <= 6 then
         trimmedLog = log
     else
         trimmedLog = {}
-        for i = 1, 10 do trimmedLog[#trimmedLog + 1] = log[i] end
-        trimmedLog[#trimmedLog + 1] = '... (' .. (#log - 20) .. ' rounds omitted) ...'
-        for i = #log - 9, #log do trimmedLog[#trimmedLog + 1] = log[i] end
+        for i = 1, 3 do trimmedLog[#trimmedLog + 1] = log[i] end
+        trimmedLog[#trimmedLog + 1] = '...'
+        for i = #log - 2, #log do trimmedLog[#trimmedLog + 1] = log[i] end
     end
 
     return aRegLost, aCmdDmg, dRegLost, dCmdDmg, trimmedLog, retreated
