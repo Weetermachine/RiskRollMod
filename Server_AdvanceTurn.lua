@@ -161,18 +161,15 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     end
     orderResult.DefendingArmiesKilled = WL.Armies.Create(dRegLost, defendKilledSpecials)
 
-    -- Handle partial commander damage via DamageToSpecialUnits
-    -- (only needed if commander took damage but didn't die)
-    local dmgTable = {}
-    if attackHasCmd and aCmdDmg > 0 and not attackCmdKilled then
-        dmgTable[attackCommander.ID] = aCmdDmg
-    end
-    if defendHasCmd and dCmdDmg > 0 and not defendCmdKilled then
-        dmgTable[defendCommander.ID] = dCmdDmg
-    end
-    -- Per the rules: commander health resets if they survive, so we
-    -- don't actually persist partial damage. Leave dmgTable empty for survivors.
-    -- DamageToSpecialUnits is only set for killed commanders (handled above).
+    -- Emit a visible message showing the Risk dice outcome
+    local resultMsg = '[Risk Dice] Attacker lost ' .. aRegLost .. ' armies'
+    if attackCmdKilled then resultMsg = resultMsg .. ' + commander KILLED' end
+    resultMsg = resultMsg .. ', Defender lost ' .. dRegLost .. ' armies'
+    if defendCmdKilled then resultMsg = resultMsg .. ' + commander KILLED' end
+    resultMsg = resultMsg .. '. Warzone result: ' .. tostring(orderResult.IsSuccessful)
+
+    local event = WL.GameOrderEvent.Create(playerID, resultMsg, nil, nil, nil, nil)
+    addNewOrder(event, true)
 end
 
 function Server_AdvanceTurn_End(game, addNewOrder)
