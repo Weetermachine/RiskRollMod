@@ -169,7 +169,7 @@ local function simulateBattle(attackRegular, attackHasCmd,
         end
 
         -- Rule 2: retreat if attacker has lost X% more than defender after 3+ rounds
-        if retreatOnLossRatio and round >= 3 and dRegLost > 0 then
+        if retreatOnLossRatio and round >= retreatMinRounds and dRegLost > 0 then
             local lossRatio = (aRegLost / dRegLost - 1) * 100
             if lossRatio >= retreatLossRatioPct then
                 retreated = true
@@ -226,7 +226,9 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local maxDefendDice      = tonumber(Mod.Settings.MaxDefendDice)      or 2
     local retreatOnDiceParity = Mod.Settings.RetreatOnDiceParity ~= false
     local retreatOnLossRatio  = Mod.Settings.RetreatOnLossRatio  ~= false
-    local retreatLossRatioPct = tonumber(Mod.Settings.RetreatLossRatioPct) or 100
+    local retreatLossRatioPct   = tonumber(Mod.Settings.RetreatLossRatioPct)   or 100
+    local retreatMinRounds      = tonumber(Mod.Settings.RetreatMinRounds)      or 3
+    if retreatMinRounds < 1 then retreatMinRounds = 1 end
     if diceSides < 2          then diceSides = 2          end
     if maxAttackDice < 1      then maxAttackDice = 1      end
     if maxDefendDice < 1      then maxDefendDice = 1      end

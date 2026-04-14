@@ -75,6 +75,15 @@ function Client_PresentConfigureUI(rootParent)
         .SetSliderMaxValue(500)
 
     UI.CreateLabel(vert)
+        .SetText('Minimum rounds before loss ratio retreat triggers (default: 3)')
+
+    local minRoundsInput = UI.CreateNumberInputField(vert)
+        .SetValue(tonumber(Mod.Settings.RetreatMinRounds) or 3)
+        .SetWholeNumbers(true)
+        .SetSliderMinValue(1)
+        .SetSliderMaxValue(20)
+
+    UI.CreateLabel(vert)
         .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')
         .SetColor('#FF8C00')
 
@@ -86,4 +95,5 @@ function Client_PresentConfigureUI(rootParent)
     _RiskMod_cbDiceParity    = cbDiceParity
     _RiskMod_cbLossRatio     = cbLossRatio
     _RiskMod_lossRatioInput  = lossRatioInput
+    _RiskMod_minRoundsInput  = minRoundsInput
 end

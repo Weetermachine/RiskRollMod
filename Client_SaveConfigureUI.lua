@@ -31,6 +31,13 @@ function Client_SaveConfigureUI(alert, addCard)
     Mod.Settings.RetreatOnDiceParity  = _RiskMod_cbDiceParity.GetIsChecked()
     Mod.Settings.RetreatOnLossRatio   = _RiskMod_cbLossRatio.GetIsChecked()
 
+    local minRounds = math.floor(_RiskMod_minRoundsInput.GetValue())
+    if minRounds < 1 then
+        alert('Minimum rounds must be at least 1.')
+        return
+    end
+    Mod.Settings.RetreatMinRounds = minRounds
+
     local lossRatio = math.floor(_RiskMod_lossRatioInput.GetValue())
     if lossRatio < 1 then
         alert('Loss ratio threshold must be at least 1%.')
