@@ -179,8 +179,12 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local toTerrID  = order.To
     local defenderID = standing.Territories[toTerrID].OwnerPlayerID
 
-    local attackRegular   = order.NumArmies.NumArmies
-    local attackCommander = findCommanderInArmies(order.NumArmies, playerID)
+    -- Use orderResult.ActualArmies — Warzone's own calculation of how many
+    -- armies actually participated, accounting for exhaustion and mid-turn
+    -- army changes. This is the most accurate value available from the API.
+    local actualArmies    = orderResult.ActualArmies
+    local attackRegular   = actualArmies.NumArmies
+    local attackCommander = findCommanderInArmies(actualArmies, playerID)
     local attackHasCmd    = attackCommander ~= nil
 
     local defendRegular   = standing.Territories[toTerrID].NumArmies.NumArmies
