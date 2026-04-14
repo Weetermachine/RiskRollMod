@@ -35,7 +35,11 @@ function Client_PresentConfigureUI(rootParent)
         .SetSliderMinValue(2)
         .SetSliderMaxValue(20)
 
-    _RiskMod_rbDefender    = rbDefender
-    _RiskMod_rbAttacker    = rbAttacker
+    UI.CreateLabel(vert)
+        .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')
+        .SetColor('#FF8C00')
+
+    _RiskMod_rbDefender     = rbDefender
+    _RiskMod_rbAttacker     = rbAttacker
     _RiskMod_diceSidesInput = diceSidesInput
 end

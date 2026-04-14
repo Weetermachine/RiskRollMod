@@ -16,4 +16,8 @@ function Client_PresentSettingsUI(rootParent)
                  .. '• Die sides: ' .. diceSides .. '\n'
                  .. '• Tie winner: ' .. tieWinner .. '\n'
                  .. '• Commanders count as 7 armies and die last.')
+
+    UI.CreateLabel(vert)
+        .SetText('⚠ Compatibility: mods that read IsSuccessful from attack results may see inconsistent values when combined with this mod.')
+        .SetColor('#FF8C00')
 end

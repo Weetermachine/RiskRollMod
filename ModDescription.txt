@@ -19,6 +19,10 @@ Commanders count as 7 armies for combat purposes and are the last to die — reg
 
 Commanders only participate in an attack if you explicitly commit them to it.
 
+Mod Compatibility
+-----------------
+This mod overrides Warzone's combat kill counts but cannot override the engine's internal IsSuccessful flag, which determines whether a territory was captured. Warzone recomputes the outcome from the modified kill counts, so results are generally correct — but any other mod that reads IsSuccessful directly from the order result may see a stale or inconsistent value. Use caution when combining with mods that hook into attack results.
+
 Tips
 ----
 - Small armies can realistically beat large ones through lucky dice — every battle has a chance.
