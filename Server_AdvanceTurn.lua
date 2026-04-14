@@ -171,9 +171,7 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
         local sourceMod = WL.TerritoryModification.Create(fromTerrID)
         sourceMod.AddArmies = -attackArmies
         if attackHasCommander then
-            local removeSet = {}
-            removeSet[attackCommander.ID] = true
-            sourceMod.RemoveSpecialUnitsOpt = removeSet
+            sourceMod.RemoveSpecialUnitsOpt = { attackCommander.ID }
         end
         mods[#mods + 1] = sourceMod
 
@@ -184,9 +182,7 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
 
         -- Remove defender's commander if they died
         if defendHasCommander and defenderCommanderDied then
-            local removeSet = {}
-            removeSet[defendCommander.ID] = true
-            destMod.RemoveSpecialUnitsOpt = removeSet
+            destMod.RemoveSpecialUnitsOpt = { defendCommander.ID }
         end
 
         -- Move attacker's commander to captured territory if they survived
@@ -201,9 +197,7 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
         local sourceMod = WL.TerritoryModification.Create(fromTerrID)
         sourceMod.AddArmies = -attackLosses
         if attackHasCommander and attackerCommanderDied then
-            local removeSet = {}
-            removeSet[attackCommander.ID] = true
-            sourceMod.RemoveSpecialUnitsOpt = removeSet
+            sourceMod.RemoveSpecialUnitsOpt = { attackCommander.ID }
         end
         mods[#mods + 1] = sourceMod
 
@@ -211,9 +205,7 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
         local destMod = WL.TerritoryModification.Create(toTerrID)
         destMod.AddArmies = -defendLosses
         if defendHasCommander and defenderCommanderDied then
-            local removeSet = {}
-            removeSet[defendCommander.ID] = true
-            destMod.RemoveSpecialUnitsOpt = removeSet
+            destMod.RemoveSpecialUnitsOpt = { defendCommander.ID }
         end
         mods[#mods + 1] = destMod
     end
