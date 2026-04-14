@@ -69,7 +69,7 @@ function Client_PresentConfigureUI(rootParent)
         .SetText('Loss ratio threshold % (default: 50)')
 
     local lossRatioInput = UI.CreateNumberInputField(vert)
-        .SetValue(tonumber(Mod.Settings.RetreatLossRatioPct) or 50)
+        .SetValue(tonumber(Mod.Settings.RetreatLossRatioPct) or 100)
         .SetWholeNumbers(true)
         .SetSliderMinValue(1)
         .SetSliderMaxValue(500)

@@ -13,7 +13,7 @@ function Client_PresentSettingsUI(rootParent)
     local defendDice         = tonumber(Mod.Settings.MaxDefendDice)      or 2
     local retreatDiceParity  = Mod.Settings.RetreatOnDiceParity  == true
     local retreatLossRatio   = Mod.Settings.RetreatOnLossRatio   == true
-    local lossRatioPct       = tonumber(Mod.Settings.RetreatLossRatioPct) or 50
+    local lossRatioPct       = tonumber(Mod.Settings.RetreatLossRatioPct) or 100
 
     UI.CreateLabel(vert)
         .SetText('Replaces Warzone combat with Risk-style dice. Battles are fought to completion.\n\n'

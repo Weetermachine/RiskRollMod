@@ -146,6 +146,16 @@ local function simulateBattle(attackRegular, attackHasCmd,
             end
         end
 
+        -- Build round log line first so it appears before any retreat message
+        -- Compact format: R1: A[6,2,1] D[3,3] -1a -1d (A:9 D:7)
+        local line = 'R' .. round .. ': '
+                  .. 'A[' .. joinNums(aRolls) .. '] '
+                  .. 'D[' .. joinNums(dRolls) .. '] '
+                  .. '-' .. aLostThisRound .. 'a '
+                  .. '-' .. dLostThisRound .. 'd '
+                  .. '(A:' .. aTotal() .. ' D:' .. dTotal() .. ')'
+        log[#log + 1] = line
+
         -- Rule 1: retreat if attacker dice <= defender dice, unless they
         -- started at or below parity (deliberate underdog attack).
         if retreatOnDiceParity and initialADice > initialDDice then
@@ -163,20 +173,10 @@ local function simulateBattle(attackRegular, attackHasCmd,
             local lossRatio = (aRegLost / dRegLost - 1) * 100
             if lossRatio >= retreatLossRatioPct then
                 retreated = true
-                log[#log + 1] = '[Retreat: attacker losses ' .. math.floor(lossRatio) .. '% greater than defender]'
+                log[#log + 1] = '[Retreat: attacker losses ' .. math.floor(lossRatio) .. '% greater than defender (aLost=' .. aRegLost .. ' dLost=' .. dRegLost .. ')]'
                 break
             end
         end
-
-        -- Build round log line
-        -- Compact format: R1: A[6,2,1] D[3,3] -1a -1d (A:9 D:7)
-        local line = 'R' .. round .. ': '
-                  .. 'A[' .. joinNums(aRolls) .. '] '
-                  .. 'D[' .. joinNums(dRolls) .. '] '
-                  .. '-' .. aLostThisRound .. 'a '
-                  .. '-' .. dLostThisRound .. 'd '
-                  .. '(A:' .. aTotal() .. ' D:' .. dTotal() .. ')'
-        log[#log + 1] = line
     end
 
     -- Trim to first 10 and last 10 rounds if log is long
@@ -226,7 +226,7 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local maxDefendDice      = tonumber(Mod.Settings.MaxDefendDice)      or 2
     local retreatOnDiceParity = Mod.Settings.RetreatOnDiceParity ~= false
     local retreatOnLossRatio  = Mod.Settings.RetreatOnLossRatio  ~= false
-    local retreatLossRatioPct = tonumber(Mod.Settings.RetreatLossRatioPct) or 50
+    local retreatLossRatioPct = tonumber(Mod.Settings.RetreatLossRatioPct) or 100
     if diceSides < 2          then diceSides = 2          end
     if maxAttackDice < 1      then maxAttackDice = 1      end
     if maxDefendDice < 1      then maxDefendDice = 1      end
