@@ -187,6 +187,10 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     local attackCommander = findCommanderInArmies(actualArmies, playerID)
     local attackHasCmd    = attackCommander ~= nil
 
+    -- If no armies and no commander are available, let Warzone handle it
+    -- naturally (it will skip the order) rather than showing a 0v? result.
+    if attackRegular == 0 and not attackHasCmd then return end
+
     local defendRegular   = standing.Territories[toTerrID].NumArmies.NumArmies
     local defendCommander = findCommanderInTerritory(standing, toTerrID, defenderID)
     local defendHasCmd    = defendCommander ~= nil
