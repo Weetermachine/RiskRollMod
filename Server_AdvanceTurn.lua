@@ -105,13 +105,13 @@ local function simulateBattle(attackRegular, attackHasCmd,
         end
 
         -- Build round log line
-        local line = 'Round ' .. round .. ': '
-                  .. 'Attacker rolled [' .. joinNums(aRolls) .. '] '
-                  .. 'Defender rolled [' .. joinNums(dRolls) .. '] — '
-                  .. aLostThisRound .. ' attacker, '
-                  .. dLostThisRound .. ' defender killed. '
-                  .. '(Attackers remaining: ' .. aTotal() .. ', '
-                  .. 'Defenders remaining: ' .. dTotal() .. ')'
+        -- Compact format: R1: A[6,2,1] D[3,3] -1a -1d (A:9 D:7)
+        local line = 'R' .. round .. ': '
+                  .. 'A[' .. joinNums(aRolls) .. '] '
+                  .. 'D[' .. joinNums(dRolls) .. '] '
+                  .. '-' .. aLostThisRound .. 'a '
+                  .. '-' .. dLostThisRound .. 'd '
+                  .. '(A:' .. aTotal() .. ' D:' .. dTotal() .. ')'
         log[#log + 1] = line
     end
 
@@ -172,14 +172,14 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
 
     -- Build verbose message
     local attackerName = game.Game.Players[playerID].DisplayName(nil, false)
-    local summary = attackerName .. ' attacked with Risk dice ('
-                 .. attackRegular .. (attackHasCmd and '+CMD' or '') .. ' vs '
-                 .. defendRegular .. (defendHasCmd and '+CMD' or '') .. '):\n'
+    local summary = '[Risk] ' .. attackerName .. ' '
+                 .. attackRegular .. (attackHasCmd and '+C' or '') .. 'v'
+                 .. defendRegular .. (defendHasCmd and '+C' or '') .. ':\n'
     local fullMsg = summary .. table.concat(log, '\n')
 
     -- Append commander death notes
-    if attackCmdKilled then fullMsg = fullMsg .. '\nAttacker\'s commander was killed!' end
-    if defendCmdKilled then fullMsg = fullMsg .. '\nDefender\'s commander was killed!' end
+    if attackCmdKilled then fullMsg = fullMsg .. '\n[Attacker CMD died]' end
+    if defendCmdKilled then fullMsg = fullMsg .. '\n[Defender CMD died]' end
 
     local event = WL.GameOrderEvent.Create(playerID, fullMsg, { playerID, defenderID }, nil, nil, nil)
     addNewOrder(event, true)
