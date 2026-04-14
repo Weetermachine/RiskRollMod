@@ -163,14 +163,18 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
     end
     orderResult.DefendingArmiesKilled = WL.Armies.Create(dRegLost, defendKilledSpecials)
 
-    -- Emit a visible message showing the Risk dice outcome
+    -- Emit a visible message showing the Risk dice outcome.
+    -- Only show to players who can see the territory: attacker, defender,
+    -- and any teammate of either (they share vision).
+    -- We build the visible-to list from players on the same team as attacker or defender.
     local attackerName = game.Game.Players[playerID].DisplayName(nil, false)
     local resultMsg = attackerName .. ' rolled Risk dice: lost ' .. aRegLost
     if attackCmdKilled then resultMsg = resultMsg .. ' armies + commander' end
     resultMsg = resultMsg .. ', defender lost ' .. dRegLost
     if defendCmdKilled then resultMsg = resultMsg .. ' armies + commander' else resultMsg = resultMsg .. ' armies' end
 
-    local event = WL.GameOrderEvent.Create(playerID, resultMsg, nil, nil, nil, nil)
+    -- Only show to the attacker and defender
+    local event = WL.GameOrderEvent.Create(playerID, resultMsg, { playerID, defenderID }, nil, nil, nil)
     addNewOrder(event, true)
 end
 
