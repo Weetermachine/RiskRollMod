@@ -61,7 +61,8 @@ local function simulateBattle(attackRegular, attackHasCmd,
                                defendRegular, defendHasCmd,
                                tieGoesToAttacker, diceSides,
                                maxAttackDice, maxDefendDice,
-                               retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct)
+                               retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct,
+                               retreatMinRounds)
     local aReg   = attackRegular
     local aCmdHP = attackHasCmd and 7 or 0
     local dReg   = defendRegular
@@ -239,7 +240,8 @@ function Server_AdvanceTurn_Order(game, order, orderResult, skipThisOrder, addNe
                        defendRegular, defendHasCmd,
                        tieGoesToAttacker, diceSides,
                        maxAttackDice, maxDefendDice,
-                       retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct)
+                       retreatOnDiceParity, retreatOnLossRatio, retreatLossRatioPct,
+                       retreatMinRounds)
 
     local attackCmdKilled  = attackHasCmd and aCmdDmg >= 7
     local defendCmdKilled  = defendHasCmd and dCmdDmg >= 7
