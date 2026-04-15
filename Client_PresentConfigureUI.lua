@@ -66,7 +66,7 @@ function Client_PresentConfigureUI(rootParent)
         .SetIsChecked(Mod.Settings.RetreatOnLossRatio ~= false)
 
     UI.CreateLabel(vert)
-        .SetText('Loss ratio threshold % (default: 50)')
+        .SetText('Loss ratio threshold % (default: 100)')
 
     local lossRatioInput = UI.CreateNumberInputField(vert)
         .SetValue(tonumber(Mod.Settings.RetreatLossRatioPct) or 100)
